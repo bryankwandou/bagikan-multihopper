@@ -45,7 +45,7 @@ Guards: devnet mode refuses any key that does not start with `mh_test_`, and bot
 
 Prerequisites, all done by the owner in the MultiHopper production dashboard: a `mh_live_` key, a rewards wallet holding the rent-exempt minimum (`MH_091` otherwise), and attribution confirmed in the builder chat.
 
-Add to `prototype/.env` (git-ignored): `MH_LIVE_KEY=mh_live_...`, `MAINNET_KEYPAIR=<path to the payout wallet>`, `MAINNET_MAX_SOL=<cap>`, optionally `MAINNET_RPC=<your RPC>`.
+Store the key without seeing it: copy it in the dashboard, then run `node scripts/set-key.mjs --live --clipboard` (it writes `MH_LIVE_KEY`, clears the clipboard and checks the key). Also add to `prototype/.env` (git-ignored): `MAINNET_KEYPAIR=<path to the payout wallet>`, `MAINNET_MAX_SOL=<cap>`, optionally `MAINNET_RPC=<your RPC>`.
 
 1. Quote only, sends nothing:
    ```bash
