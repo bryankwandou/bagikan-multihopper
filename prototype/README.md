@@ -41,6 +41,23 @@ Guards: devnet mode refuses any key that does not start with `mh_test_`, and bot
 
 `/prepare` returns base64 transactions: `routeInitTxs` as `{ base64 }` objects, `orchestratorInitTx` as a legacy transaction, the rest versioned. Null groups are skipped. SOL Multi-Send requires every recipient to receive at least the rent-exempt minimum after fees (`MH_017`), so avoid tiny amounts on devnet.
 
+## Mainnet (real funds, run by the treasury owner)
+
+Prerequisites, all done by the owner in the MultiHopper production dashboard: a `mh_live_` key, a rewards wallet holding the rent-exempt minimum (`MH_091` otherwise), and attribution confirmed in the builder chat.
+
+Add to `prototype/.env` (git-ignored): `MH_LIVE_KEY=mh_live_...`, `MAINNET_KEYPAIR=<path to the payout wallet>`, `MAINNET_MAX_SOL=<cap>`, optionally `MAINNET_RPC=<your RPC>`.
+
+1. Quote only, sends nothing:
+   ```bash
+   node src/run.ts payouts.csv --mode mainnet --quote-only
+   ```
+2. Send:
+   ```bash
+   node src/run.ts payouts.csv --mode mainnet
+   ```
+
+Before the first transaction the CLI quotes every batch, refuses if the total is above `MAINNET_MAX_SOL` or the wallet cannot cover the up-front SOL, and asks the operator to type `SEND <total>` in an interactive terminal. Anything else cancels. Use a dedicated payout wallet funded with the campaign budget only.
+
 ## Files
 
 | File | Purpose |
