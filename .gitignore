@@ -8,3 +8,5 @@ devnet-recipients/
 
 .vercel
 thread-x.md
+
+.env*
