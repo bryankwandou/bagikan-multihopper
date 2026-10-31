@@ -1,0 +1,16 @@
+{
+  "name": "hoproll-prototype",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "mock": "node src/run.ts examples/payouts.csv --mode mock",
+    "devnet": "node src/run.ts examples/payouts.csv --mode devnet",
+    "test": "node --test test/payout.test.ts"
+  },
+  "engines": {
+    "node": ">=23.6"
+  },
+  "optionalDependencies": {
+    "@solana/web3.js": "^1.98.0"
+  }
+}

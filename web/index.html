@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hoproll · Batch payouts on Solana</title>
+<meta name="description" content="Pay creators, bounty winners and contributors from one CSV. Hoproll splits the list into MultiHopper Multi-Send batches of 20 and gives finance a per-wallet evidence file.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f3f0e8; --paper: #fbfaf6; --ink: #17160f; --muted: #6b685c; --faint: #9a968a;
+    --rule: #d9d4c5; --rule-strong: #b9b3a1; --accent: #0e5a4b; --accent-ink: #ffffff; --accent-soft: #dfe9e3;
+    --bad: #9b2c1f; --serif: "Fraunces", Georgia, serif; --sans: "IBM Plex Sans", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12120f; --paper: #1a1a16; --ink: #eceadf; --muted: #a8a596; --faint: #77746a;
+      --rule: #2e2d27; --rule-strong: #46443b; --accent: #7cc7ae; --accent-ink: #0b1712; --accent-soft: #1d2d27; --bad: #ef8f80;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12120f; --paper: #1a1a16; --ink: #eceadf; --muted: #a8a596; --faint: #77746a;
+    --rule: #2e2d27; --rule-strong: #46443b; --accent: #7cc7ae; --accent-ink: #0b1712; --accent-soft: #1d2d27; --bad: #ef8f80;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--sans); }
+  a { color: inherit; text-underline-offset: 3px; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+  .num, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* header */
+  header.top { border-bottom: 1px solid var(--rule); }
+  header.top .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; gap: 16px; }
+  .mark { font-family: var(--serif); font-weight: 600; font-size: 1.35rem; letter-spacing: -0.01em; text-decoration: none; }
+  .mark span { color: var(--accent); }
+  nav { display: flex; gap: 22px; font-size: .92rem; color: var(--muted); }
+  nav a { text-decoration: none; }
+  nav a:hover { color: var(--ink); }
+  @media (max-width: 640px) { nav a:not(.keep) { display: none; } }
+
+  /* hero */
+  .hero { display: grid; grid-template-columns: 1.05fr .95fr; gap: 56px; padding: 72px 0 80px; align-items: center; }
+  @media (max-width: 900px) { .hero { grid-template-columns: 1fr; gap: 40px; padding: 48px 0 56px; } }
+  .eyebrow { font-family: var(--mono); font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 18px; }
+  h1 { font-family: var(--serif); font-weight: 500; font-size: clamp(2.3rem, 5.2vw, 3.7rem); line-height: 1.04; letter-spacing: -0.025em; margin: 0 0 22px; }
+  h1 em { font-style: italic; color: var(--accent); }
+  .lede { font-size: 1.12rem; color: var(--muted); max-width: 52ch; margin: 0 0 30px; }
+  .ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn { display: inline-block; font: 500 .95rem var(--sans); padding: 12px 20px; border-radius: 4px; border: 1px solid var(--rule-strong); background: transparent; color: var(--ink); text-decoration: none; cursor: pointer; }
+  .btn:hover { border-color: var(--ink); }
+  .btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .btn.primary:hover { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn:disabled { opacity: .45; cursor: default; }
+
+  /* ledger card */
+  .ledger { background: var(--paper); border: 1px solid var(--rule); box-shadow: 0 1px 0 var(--rule), 0 24px 48px -32px rgba(23,22,15,.35); }
+  .ledger-head { display: flex; justify-content: space-between; align-items: baseline; padding: 16px 20px; border-bottom: 1px solid var(--rule); }
+  .ledger-head b { font-family: var(--serif); font-weight: 600; font-size: 1.05rem; }
+  .ledger-head span { font-family: var(--mono); font-size: .78rem; color: var(--muted); }
+  .ledger table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+  .ledger td { padding: 9px 20px; border-bottom: 1px dashed var(--rule); }
+  .ledger td:last-child { text-align: right; }
+  .ledger tr:last-child td { border-bottom: 0; }
+  .ledger .st { font-family: var(--mono); font-size: .74rem; color: var(--accent); text-transform: uppercase; letter-spacing: .06em; }
+  .ledger-foot { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--rule-strong); }
+  .ledger-foot div { padding: 12px 20px; border-right: 1px solid var(--rule); }
+  .ledger-foot div:last-child { border-right: 0; }
+  .ledger-foot small { display: block; font-size: .72rem; color: var(--muted); }
+  .ledger-foot b { font-family: var(--mono); font-weight: 500; font-size: .95rem; }
+  .caption { font-size: .78rem; color: var(--faint); margin-top: 10px; }
+
+  /* sections */
+  section.band { border-top: 1px solid var(--rule); padding: 80px 0; }
+  @media (max-width: 640px) { section.band { padding: 56px 0; } }
+  .sec-head { display: grid; grid-template-columns: 220px 1fr; gap: 40px; margin-bottom: 44px; }
+  @media (max-width: 800px) { .sec-head { grid-template-columns: 1fr; gap: 8px; } }
+  .sec-head .label { font-family: var(--mono); font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding-top: 10px; }
+  h2 { font-family: var(--serif); font-weight: 500; font-size: clamp(1.7rem, 3.4vw, 2.4rem); line-height: 1.12; letter-spacing: -0.02em; margin: 0 0 14px; max-width: 24ch; }
+  .sec-head p { color: var(--muted); max-width: 62ch; margin: 0; }
+
+  .problems { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--ink); }
+  @media (max-width: 800px) { .problems { grid-template-columns: 1fr; } }
+  .problems article { padding: 24px 28px 8px 0; border-right: 1px solid var(--rule); }
+  .problems article + article { padding-left: 28px; }
+  .problems article:last-child { border-right: 0; }
+  @media (max-width: 800px) { .problems article, .problems article + article { padding: 22px 0; border-right: 0; border-bottom: 1px solid var(--rule); } }
+  .problems .n { font-family: var(--mono); font-size: .8rem; color: var(--accent); }
+  .problems h3 { font-family: var(--serif); font-weight: 600; font-size: 1.25rem; margin: 6px 0 8px; }
+  .problems p { color: var(--muted); margin: 0; font-size: .96rem; }
+
+  /* steps */
+  .steps { counter-reset: s; display: grid; gap: 0; border-top: 1px solid var(--ink); }
+  .step { display: grid; grid-template-columns: 64px 1fr 1.1fr; gap: 24px; padding: 22px 0; border-bottom: 1px solid var(--rule); align-items: start; }
+  @media (max-width: 800px) { .step { grid-template-columns: 40px 1fr; } .step code.call { grid-column: 2; } }
+  .step::before { counter-increment: s; content: counter(s, decimal-leading-zero); font-family: var(--mono); color: var(--faint); font-size: .9rem; padding-top: 2px; }
+  .step h3 { font-size: 1rem; font-weight: 600; margin: 0 0 4px; }
+  .step p { margin: 0; color: var(--muted); font-size: .94rem; }
+  code.call { font-family: var(--mono); font-size: .8rem; background: var(--paper); border: 1px solid var(--rule); padding: 10px 12px; display: block; white-space: pre-wrap; word-break: break-word; line-height: 1.55; }
+
+  /* tables */
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--rule); background: var(--paper); }
+  table.grid { border-collapse: collapse; width: 100%; font-size: .9rem; }
+  table.grid th, table.grid td { padding: 12px 16px; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+  table.grid thead th { font-weight: 600; font-size: .8rem; color: var(--muted); border-bottom: 1px solid var(--rule-strong); white-space: nowrap; }
+  table.grid tbody th { font-weight: 500; width: 34%; }
+  table.grid td.us { background: var(--accent-soft); }
+  table.grid tr:last-child th, table.grid tr:last-child td { border-bottom: 0; }
+  .no { color: var(--faint); }
+  .fine { font-size: .82rem; color: var(--faint); margin-top: 12px; max-width: 80ch; }
+
+  /* calculator */
+  .calc { display: grid; grid-template-columns: 340px 1fr; border: 1px solid var(--rule); background: var(--paper); }
+  @media (max-width: 800px) { .calc { grid-template-columns: 1fr; } }
+  .calc .in { padding: 24px; border-right: 1px solid var(--rule); display: grid; gap: 18px; align-content: start; }
+  @media (max-width: 800px) { .calc .in { border-right: 0; border-bottom: 1px solid var(--rule); } }
+  label { display: block; font-size: .82rem; font-weight: 500; margin-bottom: 6px; }
+  input[type=number] { width: 100%; font: 500 1.05rem var(--mono); padding: 10px 12px; border: 1px solid var(--rule-strong); background: var(--bg); color: var(--ink); border-radius: 3px; }
+  input:focus, textarea:focus, .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .calc .out { display: grid; grid-template-columns: repeat(2, 1fr); }
+  .calc .out div { padding: 22px 24px; border-bottom: 1px solid var(--rule); border-right: 1px solid var(--rule); }
+  .calc .out div:nth-child(2n) { border-right: 0; }
+  .calc .out div:nth-last-child(-n+2) { border-bottom: 0; }
+  .calc .out small { display: block; font-size: .8rem; color: var(--muted); margin-bottom: 4px; }
+  .calc .out b { font-family: var(--mono); font-weight: 500; font-size: 1.35rem; }
+
+  /* console */
+  .console { border: 1px solid var(--rule); background: var(--paper); }
+  .console-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--rule); }
+  .console-bar b { font-size: .9rem; }
+  .console-bar span { font-size: .8rem; color: var(--muted); }
+  textarea { display: block; width: 100%; min-height: 220px; font: 12.5px/1.6 var(--mono); padding: 14px 16px; border: 0; border-bottom: 1px solid var(--rule); background: var(--bg); color: var(--ink); resize: vertical; }
+  .console .row { display: flex; gap: 10px; flex-wrap: wrap; padding: 14px 16px; }
+  .err { color: var(--bad); font-family: var(--mono); font-size: .85rem; padding: 0 16px 14px; white-space: pre-wrap; }
+  .err:empty { display: none; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--rule); }
+  @media (max-width: 700px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .stats div { padding: 16px; border-right: 1px solid var(--rule); }
+  .stats div:last-child { border-right: 0; }
+  .stats small { display: block; font-size: .76rem; color: var(--muted); }
+  .stats b { font-family: var(--mono); font-weight: 500; font-size: 1.1rem; }
+  .ev { overflow-x: auto; border-top: 1px solid var(--rule); max-height: 420px; }
+  .ev table { border-collapse: collapse; width: 100%; font: 12px/1.4 var(--mono); }
+  .ev th, .ev td { padding: 8px 14px; border-bottom: 1px solid var(--rule); white-space: nowrap; text-align: left; }
+  .ev th { position: sticky; top: 0; background: var(--paper); color: var(--muted); font-weight: 500; }
+  .ev td.r { text-align: right; }
+
+  /* log */
+  .log { border-top: 1px solid var(--ink); }
+  .log li { display: grid; grid-template-columns: 120px 110px 1fr; gap: 20px; padding: 14px 0; border-bottom: 1px solid var(--rule); list-style: none; }
+  @media (max-width: 700px) { .log li { grid-template-columns: 1fr; gap: 2px; } }
+  .log ol { margin: 0; padding: 0; }
+  .log time, .log .state { font-family: var(--mono); font-size: .82rem; color: var(--muted); }
+  .log .state.done { color: var(--accent); }
+
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+  @media (max-width: 800px) { .two { grid-template-columns: 1fr; gap: 28px; } }
+  .two h3 { font-family: var(--serif); font-weight: 600; font-size: 1.2rem; margin: 0 0 8px; }
+  .two p, .two li { color: var(--muted); }
+  .two ul { padding-left: 18px; margin: 0; }
+
+  footer { border-top: 1px solid var(--rule); padding: 36px 0 56px; color: var(--muted); font-size: .88rem; }
+  footer .wrap { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="mark" href="#">Hop<span>roll</span></a>
+    <nav>
+      <a href="#problem">Problem</a>
+      <a href="#how">How it works</a>
+      <a href="#compare">Compare</a>
+      <a href="#console" class="keep">Console</a>
+      <a href="https://github.com/bryankwandou/hoproll" class="keep">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Batch payouts on Solana, routed by MultiHopper</p>
+        <h1>Pay forty wallets in <em>one run</em>, not one afternoon.</h1>
+        <p class="lede">Upload the payout list your campaign already has. Hoproll checks every address, splits the list into Multi-Send batches of 20, and hands finance a per-wallet record of what was paid and when.</p>
+        <div class="ctas">
+          <a class="btn primary" href="#console">Open the console</a>
+          <a class="btn" href="#how">See the integration</a>
+        </div>
+      </div>
+      <figure style="margin:0">
+        <div class="ledger" aria-label="Example batch">
+          <div class="ledger-head"><b>Campaign · batch 01</b><span>20 of 43 wallets</span></div>
+          <table>
+            <tr><td class="mono">7xKp…q9Ld</td><td class="num">1.250 SOL</td><td><span class="st">paid</span></td></tr>
+            <tr><td class="mono">3mRt…Hw2e</td><td class="num">0.750 SOL</td><td><span class="st">paid</span></td></tr>
+            <tr><td class="mono">Bq8v…n4Zc</td><td class="num">2.000 SOL</td><td><span class="st">paid</span></td></tr>
+            <tr><td class="mono">Fz1a…Up7k</td><td class="num">0.500 SOL</td><td><span class="st">paid</span></td></tr>
+            <tr><td class="mono">9cWe…Tr3m</td><td class="num">1.000 SOL</td><td><span class="st">pending</span></td></tr>
+          </table>
+          <div class="ledger-foot">
+            <div><small>Batch total</small><b>21.40 SOL</b></div>
+            <div><small>Fee, 0.5%</small><b>0.107 SOL</b></div>
+            <div><small>Transfers</small><b>1</b></div>
+          </div>
+        </div>
+        <figcaption class="caption">Illustration of one batch. Addresses shortened.</figcaption>
+      </figure>
+    </section>
+  </div>
+
+  <section class="band" id="problem">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="label">01 · Problem</div>
+        <div>
+          <h2>Every campaign ends with a spreadsheet and a wallet.</h2>
+          <p>Creator campaigns, bounties, hackathons and DAO grants all finish the same way: one treasury, a list of 30 to 200 wallets, and someone pasting addresses into a wallet app one at a time.</p>
+        </div>
+      </div>
+      <div class="problems">
+        <article><div class="n">A</div><h3>It is slow</h3><p>Forty recipients means forty copy, paste, check, sign cycles. The person doing it usually has other work waiting.</p></article>
+        <article><div class="n">B</div><h3>One typo is final</h3><p>A wrong character sends funds to a wallet nobody controls. There is no chargeback and no support desk.</p></article>
+        <article><div class="n">C</div><h3>The treasury reads like a rate card</h3><p>Every direct payout from one wallet is public. Anyone with an explorer can list who you paid, how much, and when.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="how">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="label">02 · How it works</div>
+        <div>
+          <h2>Four API calls per batch, signed in a fixed order.</h2>
+          <p>Hoproll is a thin layer over the MultiHopper API. It never holds funds: the treasury owner signs, MultiHopper's keeper network executes the route on-chain.</p>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="step"><div><h3>Validate and batch the CSV</h3><p>Base58 address check, duplicates merged, amounts converted to raw units with BigInt so shares add up exactly. Lists over 20 become several batches.</p></div><code class="call">wallet,amount,note
+7xKp…q9Ld,1.25,creator-1
+→ batch 0 (20) · batch 1 (20) · batch 2 (3)</code></div>
+        <div class="step"><div><h3>Quote, then create</h3><p>The estimate shows the fee before anyone signs. Each batch is created with its own externalId and an Idempotency-Key, so a double click never creates a second transfer.</p></div><code class="call">POST /transfers/estimate { destinationCount: 20 }
+POST /transfers { destinations[≤20], hops, arrivalSeconds, externalId }</code></div>
+        <div class="step"><div><h3>Sign in the order the docs require</h3><p>The keeper funding transaction is signed and recorded first. Then route, orchestrator, session and dispersion. Groups that come back null are already on-chain and are skipped.</p></div><code class="call">POST /transfers/:id/prepare
+keeperFundingTx → routeInitTxs → orchestratorInitTx
+→ sessionInitTxs → dispersionInitTxs</code></div>
+        <div class="step"><div><h3>Confirm and record evidence</h3><p>Broadcast is confirmed in two stages. Status per recipient moves from pending to paid, read from the transfer or from a signed webhook.</p></div><code class="call">POST /transfers/:id/confirm-broadcast
+GET /transfers/:id · webhook transfer.completed
+x-multihopper-signature: HMAC-SHA256</code></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="compare">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="label">03 · Compared</div>
+        <div>
+          <h2>Bulk senders already exist. Routing is the gap.</h2>
+          <p>Tools like Multisender and Streamflow Payouts already take a CSV and pay many wallets. Hoproll does not try to beat them on batch size. It adds what a direct send cannot: multi-hop routing, a chosen arrival time, compliance screening, and an evidence file per wallet.</p>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="grid">
+          <thead><tr><th></th><th>Manual, one by one</th><th>CSV bulk senders</th><th>Hoproll on MultiHopper</th></tr></thead>
+          <tbody>
+            <tr><th>CSV import</th><td class="no">No</td><td>Yes</td><td class="us">Yes</td></tr>
+            <tr><th>Recipients per transfer</th><td>1</td><td>Many, split across transactions</td><td class="us">Up to 20 per Multi-Send, auto-batched</td></tr>
+            <tr><th>Multi-hop route with set arrival time</th><td class="no">No</td><td class="no">Not in the public docs we read</td><td class="us">3 to 10 hops, arrival 60 s to 30 days</td></tr>
+            <tr><th>Compliance screening</th><td class="no">No</td><td class="no">Not in the public docs we read</td><td class="us">TRM Labs screening on mainnet</td></tr>
+            <tr><th>Per-wallet evidence for finance</th><td class="no">Manual notes</td><td>Payout history (Streamflow)</td><td class="us">CSV: transfer ID, signature, time, amount</td></tr>
+            <tr><th>Cost</th><td>Network fees</td><td>Varies by tool</td><td class="us">0.5% + 0.002 SOL per screened wallet</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="fine">Sources: MultiHopper developer docs (multi-destination, prepare, pricing), Streamflow Payouts help article, read 31 Oct 2026. Routing reduces simple linkage between a treasury and its recipients. It does not guarantee anonymity, and Hoproll does not market it that way.</p>
+    </div>
+  </section>
+
+  <section class="band" id="cost">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="label">04 · Cost</div>
+        <div>
+          <h2>Know the bill before anyone signs.</h2>
+          <p>Fees from MultiHopper's published pricing. The per-hop SOL fee depends on USD value (zero at $50 or less, up to 0.002 SOL above $500) and is left out here.</p>
+        </div>
+      </div>
+      <div class="calc">
+        <div class="in">
+          <div><label for="cN">Recipients</label><input id="cN" type="number" min="1" max="2000" value="43"></div>
+          <div><label for="cT">Total payout (SOL)</label><input id="cT" type="number" min="0" step="0.1" value="45"></div>
+        </div>
+        <div class="out">
+          <div><small>Multi-Send batches</small><b id="oB">3</b></div>
+          <div><small>Routing fee, 0.5%</small><b id="oF">0.225 SOL</b></div>
+          <div><small>Mainnet screening</small><b id="oS">0.086 SOL</b></div>
+          <div><small>Total cost</small><b id="oC">0.311 SOL</b></div>
+        </div>
+      </div>
+      <p class="fine">For one or two payments a plain wallet transfer is cheaper. Hoproll makes sense once a team pays a list on a schedule.</p>
+    </div>
+  </section>
+
+  <section class="band" id="console">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="label">05 · Console</div>
+        <div>
+          <h2>Paste a list. See the batches and the evidence file.</h2>
+          <p>This page runs the same validation and batching code as the CLI, in your browser. It does not call the API or touch the chain, so transfer IDs and signatures below are placeholders marked <span class="mono">DRYRUN_</span>. Live transfers run from the CLI in the repo.</p>
+        </div>
+      </div>
+      <div class="console">
+        <div class="console-bar"><b>payouts.csv</b><span>wallet, amount in SOL, note</span></div>
+        <textarea id="csv" spellcheck="false" aria-label="Payout CSV"></textarea>
+        <div class="row">
+          <button class="btn primary" id="run">Run dry run</button>
+          <button class="btn" id="dl" disabled>Download evidence CSV</button>
+          <button class="btn" id="bad">Try a list with errors</button>
+        </div>
+        <div class="err" id="err" role="alert"></div>
+        <div id="result" hidden>
+          <div class="stats" id="stats"></div>
+          <div class="ev"><table id="table"></table></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="status">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="label">06 · Build log</div>
+        <div>
+          <h2>Where the integration stands.</h2>
+          <p>Kept honest on purpose. Signatures will be linked here as they land.</p>
+        </div>
+      </div>
+      <div class="log">
+        <ol>
+          <li><time>31 Oct 2026</time><span class="state done">done</span><span>Read the MultiHopper docs end to end: quickstart, multi-destination, prepare, pricing, webhooks, usage.</span></li>
+          <li><time>31 Oct 2026</time><span class="state done">done</span><span>TypeScript CLI: CSV parsing, batching, API client with Idempotency-Key, signer in the required order, webhook HMAC check, evidence export. 4 unit tests pass.</span></li>
+          <li><time>31 Oct 2026</time><span class="state done">done</span><span>Production attribution cleared with the MultiHopper team in the builder chat.</span></li>
+          <li><time>31 Oct 2026</time><span class="state done">done</span><span>Devnet treasury funded, five fresh devnet recipient wallets generated.</span></li>
+          <li><time>Next</time><span class="state">in progress</span><span>First Multi-Send transfers on devnet with a mh_test_ key.</span></li>
+          <li><time>Then</time><span class="state">planned</span><span>Web signing with a wallet adapter, webhook endpoint, first mainnet campaign payout.</span></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap two">
+      <div>
+        <h3>Who it is for</h3>
+        <ul>
+          <li>Agencies and projects paying creators and KOLs after a campaign</li>
+          <li>Bounty and hackathon organisers paying winners</li>
+          <li>DAOs sending grants, small teams paying contributors</li>
+        </ul>
+      </div>
+      <div>
+        <h3>What it will not do</h3>
+        <ul>
+          <li>Hold your funds or your keys. The treasury owner signs.</li>
+          <li>Promise anonymity. Routing reduces simple linkage, nothing more.</li>
+          <li>Hide fees. The quote is shown before the first signature.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Hoproll · built by Bryan Kwandou, Makassar · for the MultiHopper Build and Route program</span>
+    <span><a href="https://github.com/bryankwandou/hoproll">Source on GitHub</a> · <a href="https://dev-docs.multihopper.com/quickstart">MultiHopper docs</a></span>
+  </div>
+</footer>
+
+<script>
+const A = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const ONE = 10n ** 9n;
+const rnd = (n) => Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => A[b % 58]).join("");
+const hex = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, "0")).join("");
+const $ = (id) => document.getElementById(id);
+
+const sample = ["wallet,amount,note"];
+for (let i = 1; i <= 43; i++) sample.push(`${rnd(44)},${(0.5 + (i % 7) * 0.25).toFixed(2)},creator-${i}`);
+$("csv").value = sample.join("\n");
+
+$("bad").onclick = () => {
+  $("csv").value = ["wallet,amount,note", `${rnd(44)},1.5,ok`, "0xAbC123notSolana,2,wrong chain", `${rnd(44)},0.1234567891,too many decimals`].join("\n");
+  $("run").click();
+};
+
+function toRaw(s) {
+  const m = s.trim().match(/^(\d+)(?:\.(\d+))?$/);
+  if (!m) throw new Error(`invalid amount "${s}"`);
+  const f = m[2] || "";
+  if (f.length > 9) throw new Error(`"${s}" has more than 9 decimals`);
+  return BigInt(m[1]) * ONE + BigInt(f.padEnd(9, "0") || "0");
+}
+function fromRaw(r) {
+  const s = r.toString().padStart(10, "0");
+  const f = s.slice(-9).replace(/0+$/, "");
+  return f ? `${s.slice(0, -9)}.${f}` : s.slice(0, -9);
+}
+function parse(csv) {
+  const map = new Map(), errs = [];
+  csv.split(/\r?\n/).forEach((line, i) => {
+    const t = line.trim();
+    if (!t || t.startsWith("#")) return;
+    const [w, a, ...rest] = t.split(",").map((c) => c.trim());
+    if (i === 0 && w.toLowerCase() === "wallet") return;
+    try {
+      if (!BASE58.test(w)) throw new Error(`not a Solana address "${w}"`);
+      const raw = toRaw(a || "");
+      if (raw <= 0n) throw new Error("amount must be above 0");
+      const p = map.get(w);
+      map.set(w, { wallet: w, raw: (p ? p.raw : 0n) + raw, note: [p && p.note, rest.join(",")].filter(Boolean).join("; ") });
+    } catch (e) { errs.push(`line ${i + 1}: ${e.message}`); }
+  });
+  if (errs.length) throw new Error(errs.join("\n"));
+  if (!map.size) throw new Error("no recipients found");
+  return [...map.values()];
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+let evidence = "";
+$("run").onclick = () => {
+  $("err").textContent = "";
+  $("result").hidden = true;
+  $("dl").disabled = true;
+  try {
+    const payees = parse($("csv").value);
+    const batches = [];
+    for (let i = 0; i < payees.length; i += 20) batches.push(payees.slice(i, i + 20));
+    const rows = [["transferId", "externalId", "status", "wallet", "amount", "payoutSignature", "paidAt"]];
+    let total = 0n, fee = 0n;
+    const campaign = `campaign-${new Date().toISOString().slice(0, 10)}`;
+    batches.forEach((b, bi) => {
+      const sum = b.reduce((s, p) => s + p.raw, 0n);
+      total += sum; fee += (sum * 50n) / 10000n;
+      const id = `DRYRUN_tr_${hex()}`;
+      b.forEach((p) => rows.push([id, `${campaign}-batch-${bi}`, "paid", p.wallet, fromRaw(p.raw), `DRYRUN_sig_${hex()}`, new Date().toISOString()]));
+    });
+    $("stats").innerHTML = [
+      ["Recipients", payees.length], ["Batches", batches.length],
+      ["Total sent", `${fromRaw(total)} SOL`], ["Fee, 0.5%", `${fromRaw(fee)} SOL`],
+    ].map(([l, v]) => `<div><small>${l}</small><b>${v}</b></div>`).join("");
+    const [head, ...body] = rows;
+    $("table").innerHTML = `<thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>` +
+      body.map((r) => `<tr>${r.map((c, i) => `<td class="${i === 4 ? "r" : ""}">${esc(c)}</td>`).join("")}</tr>`).join("") + "</tbody>";
+    evidence = rows.map((r) => r.join(",")).join("\n") + "\n";
+    $("result").hidden = false;
+    $("dl").disabled = false;
+  } catch (e) {
+    $("err").textContent = e.message;
+  }
+};
+$("dl").onclick = () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([evidence], { type: "text/csv" }));
+  a.download = "hoproll-evidence-dryrun.csv";
+  a.click();
+};
+
+function calc() {
+  const n = Math.max(0, Math.floor(+$("cN").value || 0));
+  const t = Math.max(0, +$("cT").value || 0);
+  const f = (x) => `${(Math.round(x * 1000) / 1000).toLocaleString("en-US", { maximumFractionDigits: 3 })} SOL`;
+  $("oB").textContent = Math.ceil(n / 20);
+  $("oF").textContent = f(t * 0.005);
+  $("oS").textContent = f(n * 0.002);
+  $("oC").textContent = f(t * 0.005 + n * 0.002);
+}
+$("cN").oninput = $("cT").oninput = calc;
+calc();
+</script>
+</body>
+</html>

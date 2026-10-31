@@ -1,0 +1,10 @@
+node_modules/
+out/
+.env*
+*.keypair.json
+devnet.json
+devnet-recipients/
+.vercel
+
+.vercel
+thread-x.md
