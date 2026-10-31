@@ -23,7 +23,8 @@ Background and sources: [RESEARCH.md](RESEARCH.md).
 ## Status
 
 - Done: docs read end to end, CLI with 4 passing unit tests, production attribution cleared with the MultiHopper team, devnet treasury funded.
-- Next: first devnet Multi-Send transfers, then wallet-adapter signing on the web, a webhook endpoint, and a first mainnet campaign payout.
-- No devnet or mainnet transfer has happened yet. Every ID on the web console is a `DRYRUN_` placeholder.
+- Done: first live devnet Multi-Send. Transfer #1541 sent 0.25 SOL to 5 wallets over 3 hops and completed on 31 Oct 2026 at 02:54 UTC with all 5 recipients paid. Evidence with explorer links: [`proof/devnet-transfer-1541.csv`](proof/devnet-transfer-1541.csv).
+- Next: wallet-adapter signing on the web, a webhook endpoint, and a first mainnet campaign payout.
+- No mainnet transfer has happened yet. IDs on the web console are `DRYRUN_` placeholders; the devnet proof above is real.
 
 Built by Bryan Kwandou, Makassar.

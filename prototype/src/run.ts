@@ -46,18 +46,21 @@ async function devnetSigner(): Promise<Signer> {
         const b64 = b64Of(t);
         if (!b64) continue;
         // Docs: orchestratorInitTx is a legacy Transaction, everything else a VersionedTransaction.
+        // Only the parse is guarded; send and confirm errors must surface, never fall through silently.
         const bytes = Buffer.from(b64, "base64");
-        let sig: string;
+        let raw: Uint8Array;
         try {
           const vtx = web3.VersionedTransaction.deserialize(bytes);
           vtx.sign([kp]);
-          sig = await conn.sendTransaction(vtx);
+          raw = vtx.serialize();
         } catch {
           const tx = web3.Transaction.from(bytes);
           tx.partialSign(kp);
-          sig = await conn.sendRawTransaction(tx.serialize());
+          raw = tx.serialize({ requireAllSignatures: false });
         }
-        await conn.confirmTransaction(sig, "confirmed");
+        const sig = await conn.sendRawTransaction(raw, { maxRetries: 5 });
+        const res = await conn.confirmTransaction(sig, "confirmed");
+        if (res.value.err) throw new Error(`transaction ${sig} failed on chain: ${JSON.stringify(res.value.err)}`);
         sigs.push(sig);
       }
       return sigs;
@@ -99,7 +102,7 @@ async function sendBatch(api: MultiHopperApi, signer: Signer, b: ReturnType<type
   const { preparedTxs: p } = await api.prepare(String(created.id));
   // Documented order: keeperFundingTx first (null if keeper already funded) and recorded on its own, then the rest.
   const [keeperFundingSignature] = await signer.signAndSend([p.keeperFundingTx]);
-  if (keeperFundingSignature) await api.confirmBroadcast(String(created.id), { keeperFundingSignature });
+  if (keeperFundingSignature) await api.confirmBroadcast(String(created.id), { keeperFundingSignature, routeInitSignatures: [] });
   const rest = await signRest(signer, p);
   const confirmed = await api.confirmBroadcast(String(created.id), { keeperFundingSignature, ...rest });
   console.log(`  broadcast confirmed (${confirmed.status})`);
@@ -113,8 +116,12 @@ async function sendBatch(api: MultiHopperApi, signer: Signer, b: ReturnType<type
 }
 
 async function signRest(signer: Signer, p: PreparedTxs) {
+  // Docs ask for a short pause after route-init and orchestrator-init so the accounts are visible.
+  const pause = () => new Promise((r) => setTimeout(r, mode === "mock" ? 0 : 3_000));
   const routeInitSignatures = await signer.signAndSend((p.routeInitTxs ?? []) as PreparedTx[]);
+  await pause();
   const [orchestratorInitSignature] = await signer.signAndSend([p.orchestratorInitTx as PreparedTx]);
+  await pause();
   const sessionInitSignatures = await signer.signAndSend(p.sessionInitTxs ?? []);
   const dispersionInitSignatures = await signer.signAndSend(p.dispersionInitTxs ?? []);
   return { routeInitSignatures, orchestratorInitSignature, sessionInitSignatures, dispersionInitSignatures };

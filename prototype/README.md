@@ -2,7 +2,9 @@
 
 CSV payout list → validation → Multi-Send batches of up to 20 wallets → MultiHopper API flow (estimate, create, prepare, sign, confirm-broadcast, status) → evidence CSV.
 
-**Status:** tested in `mock` mode (offline, every ID and signature is a placeholder prefixed `MOCK_`). `devnet` mode is written and waits for a `mh_test_` key. There is no mainnet mode in this CLI, on purpose.
+**Status:** `mock` mode is tested offline (placeholders prefixed `MOCK_`). `devnet` mode completed a real Multi-Send on 31 Oct 2026, transfer #1541, see [`../proof/devnet-transfer-1541.csv`](../proof/devnet-transfer-1541.csv). There is no mainnet mode in this CLI, on purpose.
+
+Set the key without editing files by hand: copy it, then run `node scripts/set-key.mjs --clipboard`. If a run stops halfway (for example `MH_041`), finish it with `node scripts/resume.ts <transferId>`.
 
 ## Run (Node 23.6 or newer, no install needed for mock)
 

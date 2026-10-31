@@ -59,9 +59,12 @@ export class HttpMultiHopper implements MultiHopperApi {
   }
 
   private async call<T>(method: string, path: string, body?: unknown, extra: Record<string, string> = {}): Promise<T> {
+    // Every mutation needs an Idempotency-Key (MH_070); create passes its own, the rest get a fresh one.
+    if (method === "POST" && !extra["Idempotency-Key"]) extra = { ...extra, "Idempotency-Key": crypto.randomUUID() };
     const res = await fetch(`${this.baseUrl}${path}`, {
       method,
-      headers: { "content-type": "application/json", "x-api-key": this.apiKey, ...extra },
+      // Fastify rejects content-type: application/json with an empty body, so only send it with a body.
+      headers: { ...(body === undefined ? {} : { "content-type": "application/json" }), "x-api-key": this.apiKey, ...extra },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const text = await res.text();
