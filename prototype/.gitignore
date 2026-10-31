@@ -4,3 +4,4 @@ devnet.json
 *.keypair.json
 .env*
 devnet-recipients/
+.retired/
